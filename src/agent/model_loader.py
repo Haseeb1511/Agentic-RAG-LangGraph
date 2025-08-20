@@ -18,7 +18,7 @@ load_dotenv()
 
 
 
-model = ChatOpenAI(model="gpt-4.1-nano")
+# model = ChatOpenAI(model="gpt-4.1-nano")
 model = ChatGroq(model="Llama-3.3-70B-Versatile")
 
 print("Success")

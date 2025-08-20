@@ -18,6 +18,7 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -33,17 +34,23 @@ class AgenticRAG(TypedDict):
     answer:str
     vectorstore_path:str
 
+def Document_Loader(state: AgenticRAG):
+    path = os.path.abspath(state["documents_path"])  # ensure absolute
+    if os.path.isfile(path):  # single PDF case
+        loader = PyPDFLoader(path)
+        loaded_pdf = loader.load()
+    elif os.path.isdir(path):  # directory case
+        loader = DirectoryLoader(
+            path=path,
+            glob="*.pdf",
+            loader_cls=PyPDFLoader)
+        loaded_pdf = loader.load()
+    else:
+        raise ValueError(f"Invalid documents_path: {path}")
+    return {"documents": loaded_pdf}
 
 
 
-
-def Document_Loader(state:AgenticRAG):
-    loader = DirectoryLoader(
-        path=state["documents_path"],
-        glob="*.pdf",
-        loader_cls=PyPDFLoader)
-    loaded_pdf = loader.load()
-    return {"documents":loaded_pdf}
 
 def Text_Splitter(state:AgenticRAG):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=199)

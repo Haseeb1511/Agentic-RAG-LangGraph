@@ -1,9 +1,0 @@
-llm:
-  openai:
-    provider: "openai"
-    model_name: "gpt-4.1-nano"
-
-  groq:
-    provider: "groq"
-    model_name: "deepseek-r1-distill-llama-70b"
-    
