@@ -9,15 +9,14 @@ import os
 
 class GraphBuilder:
     def __init__(self):
-        pass
-
-    def build_graph(self):
         db_path = os.path.abspath("./chat_hist/chat.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         conn = sqlite3.connect(database=db_path, check_same_thread=False)
+        self.checkpointer = SqliteSaver(conn=conn)
+        self.app = None
 
+    def build_graph(self):
         graph = StateGraph(AgenticRAG)
-        checkpointer = SqliteSaver(conn=conn)
 
         graph.add_node("Document_Loader",Document_Loader,)
         graph.add_node("Text_Splitter",Text_Splitter)
@@ -40,8 +39,14 @@ class GraphBuilder:
         graph.add_edge("Retriever", "Agent")
         graph.add_edge("Agent", END)
 
-        app = graph.compile(checkpointer=checkpointer)
-        return app
+        self.app = graph.compile(checkpointer=self.checkpointer)
+        return self.app
+    
+    def retrieve_all_thread(self):
+        all_thread = set()
+        for checkpoint in self.checkpointer.list(None):
+            all_thread.add(checkpoint.config["configurable"]["thread_id"])
+        return list(all_thread)
 
     def __call__(self):  # __call__ == It lets an instance of your class be called like a function
         return self.build_graph()

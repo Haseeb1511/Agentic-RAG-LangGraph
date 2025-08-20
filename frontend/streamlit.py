@@ -8,32 +8,48 @@ import streamlit as st
 from src.agent.agentic_workflow import GraphBuilder
 from pathlib import Path
 
+import uuid
 
+from src.agent.agentic_workflow import GraphBuilder
 #==========================================================Title==================================================================================
 st.title("Agentic RAG Q&A")
 
 
-
+#=============================================================User Input==========================================================================
+user_input = st.chat_input("Ask Anything....")
 CONFIG = {"configurable":{"thread_id":"1"}}
+uploaded_pdf = st.sidebar.file_uploader("Upload PDF here to Chat with it")
+choice = st.sidebar.radio("Chose From Here:",["Dermatology","Psychiatrist","Legal"])
+
+#==========================================================Utility Functions======================================================================
+
+
 #=========================================================Session States==========================================================================
 
-if "message_history" not in st.session_state:
-    st.session_state["message_history"] = []
 
+if "chat_histories" not in st.session_state:
+    st.session_state["chat_histories"] = {
+        "Dermatology": [],
+        "Psychiatrist": [],
+        "Legal": []
+    }
 
+# Current messages to display
+current_history = st.session_state["chat_histories"][choice]
 
-#Display messages in session state in Message History
-for messages in st.session_state["message_history"]:
-    with st.chat_message(messages["role"]):
-        st.markdown(messages["content"])
+# Display messages for the selected category
+for message in current_history:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
 
 #================================================================MAIN============================================================================
 
-user_input = st.chat_input("Ask Anything....")
+
 if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
-        st.session_state["message_history"].append({"role":"user","content":user_input})
+        current_history.append({"role":"user","content":user_input})
 
 # Build Graph
 graph = GraphBuilder()
@@ -46,8 +62,7 @@ with open("graph.png","wb") as f:
 
 #=============================================================(CASE:1)Uploaded PDF================================================================
 
-uploaded_pdf = st.sidebar.file_uploader("Upload PDF here to Chat with it")
-choice = st.sidebar.radio("Chose From Here:",["Dermatology","psychiatrist","Legal"])
+
 result = None
 if user_input:
     if uploaded_pdf:
@@ -78,8 +93,11 @@ if user_input:
             "query": user_input }
             result = app.invoke(input_data,config=CONFIG)
     
-if result:    
-    ai_respone = result["answer"]
-    with st.chat_message("ai"):
-        st.markdown(ai_respone)
-        st.session_state["message_history"].append({"role":"ai","content":ai_respone})
+    if result:    
+        ai_respone = result["answer"]
+        with st.chat_message("ai"):
+            st.markdown(ai_respone)
+            current_history.append({"role":"ai","content":ai_respone})
+
+    # Save back to session_state
+    st.session_state["chat_histories"][choice] = current_history
