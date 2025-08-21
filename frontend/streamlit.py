@@ -6,6 +6,8 @@ import streamlit as st
 from src.agent.agentic_workflow import GraphBuilder
 from pathlib import Path
 
+from langchain_core.messages import HumanMessage,AIMessage
+
 # ================================================================ Build Graph Once ==============================================================
 if "graph_builder" not in st.session_state:
     st.session_state.graph_builder = GraphBuilder()
@@ -47,40 +49,45 @@ choices = base_choices + st.session_state["uploaded_pdfs"]
 # Sidebar radio includes both prebuilt and PDFs
 choice = st.sidebar.radio("Choose From Here:", choices)
 
-# ======================================================= Thread ID & Config =====================================================================
+# use choice as thread_id
 thread_id = choice
 CONFIG = {"configurable": {"thread_id": thread_id}}
 
 # ============================================================= Session States ===================================================================
+# It retrieve all chat messages from the "./chat_hist/chat.db"
 if "chat_thread" not in st.session_state:
     st.session_state["chat_thread"] = graph.retrieve_all_thread()
 
-if "chat_histories" not in st.session_state:
-    st.session_state["chat_histories"] = {}
-
-# Initialize history for this thread
-if thread_id not in st.session_state["chat_histories"]:
-    state = app.get_state(config=CONFIG)
-    st.session_state["chat_histories"][thread_id] = state.values.get("message", []) or []
-
-current_history = st.session_state["chat_histories"][thread_id]
-
 # ============================================================ Display History ===================================================================
-for message in current_history:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+
+#On restarting the Streamlit server, LangGraph reloads the messages from this SQLite database
+def load_conversation(thread_id):
+    """THis function LOAD CONVERSATION from SQLite database """
+    state = app.get_state(config={"configurable": {"thread_id": thread_id}})
+    return state.values.get("messages", [])
+
+messages = load_conversation(thread_id)
+for message in messages:
+    if isinstance(message, HumanMessage):
+        role = "user"
+    elif isinstance(message, AIMessage):
+        role = "assistant"
+    else:
+        role = "system"
+
+    with st.chat_message(role):
+        st.markdown(message.content)
+
 
 # ============================================================ Main Chat Logic ===================================================================
 if user_input:
-    # Append user message
-    current_history.append({"role": "user", "content": user_input})
+    # Persist user question in LangGraph state because we are only persisting ai message through agent node
+    app.update_state(
+        config=CONFIG,
+        values={"messages": [HumanMessage(content=user_input)]})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Update LangGraph state
-    app.update_state(
-        config=CONFIG,
-        values={"message": current_history})
     result = None
 
     # Handle PDF threads
@@ -110,17 +117,9 @@ if user_input:
     # Display AI response
     if result:
         ai_response = result["answer"]
-        current_history.append({"role": "ai", "content": ai_response})
-        with st.chat_message("ai"):
+
+        with st.chat_message("assistant"):
             st.markdown(ai_response)
-
-        # Update LangGraph state after AI response
-        app.update_state(
-            config=CONFIG,
-            values={"message": current_history})
-
-    # Save updated history back
-    st.session_state["chat_histories"][thread_id] = current_history
 
 # ========================== Save Graph as PNG ==================================================================================================
 graph_png = app.get_graph().draw_mermaid_png()

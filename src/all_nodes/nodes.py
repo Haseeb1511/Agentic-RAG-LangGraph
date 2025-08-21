@@ -6,8 +6,11 @@ import os
 
 from src.agent.model_loader import model
 from src.prompt_library.prompt import prompt_template
+
+from typing import TypedDict,Annotated
 from langchain_core.documents import Document
-from typing import TypedDict
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langgraph.graph.message import add_messages
 
 
 
@@ -24,6 +27,7 @@ load_dotenv()
 
 EMBEDDER = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
+
 class AgenticRAG(TypedDict):
     query:str
     documents_path:str
@@ -33,6 +37,9 @@ class AgenticRAG(TypedDict):
     retrieved_docs:list[Document]
     answer:str
     vectorstore_path:str
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
 
 def Document_Loader(state: AgenticRAG):
     path = os.path.abspath(state["documents_path"])  # ensure absolute
@@ -51,7 +58,6 @@ def Document_Loader(state: AgenticRAG):
 
 
 
-
 def Text_Splitter(state:AgenticRAG):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=199)
     chunks = splitter.split_documents(state["documents"])
@@ -61,7 +67,6 @@ def Create_Vector_Store(state:AgenticRAG):
     embedder = EMBEDDER
     vector_store = FAISS.from_documents(documents=state["chunks"],embedding=embedder)
     vector_store.save_local(state["vectorstore_path"])
-
     return {"vectorstore_path":state["vectorstore_path"]}
 
 
@@ -74,25 +79,38 @@ def Load_Vector_Store(state:AgenticRAG):
 
 
 def Retriever(state: AgenticRAG):
-    embedder = EMBEDDER
     vector_store = FAISS.load_local(
         folder_path=state["vectorstore_path"],
-        embeddings=embedder,
+        embeddings=EMBEDDER,
         allow_dangerous_deserialization=True)
-    
     retriever = vector_store.as_retriever()
-    docs = retriever.invoke(state["query"])
+ 
+    query = state["query"]
+
+    docs = retriever.invoke(query)
     return {"retrieved_docs": docs}
 
 
-def Agent(state:AgenticRAG):
+
+def Agent(state: AgenticRAG):
     docs = state["retrieved_docs"]
-    context = "\n\n".join([doc.page_content for doc in docs])
-    formated_prompt = prompt_template.format(
-        context = context,
-        question = state["query"])
-    response = model.invoke(formated_prompt)    
-    return{"answer":response.content}
+    doc_context = "\n\n".join([doc.page_content for doc in docs])
+
+    conversation_text = "\n".join(f"User: {m.content}" if isinstance(m,HumanMessage) else f"AI: {m.content}" for m in state.get("messages", []))
+
+    query = state["query"]
+    # Combine docs context + conversation history
+    full_context =  doc_context+ "\n\nConversation so far:\n" + conversation_text
+
+    formatted_prompt = prompt_template.format(
+        context=full_context,
+        question=query)
+    response = model.invoke(formatted_prompt)
+    return {
+        "answer": response.content,
+        "messages": [AIMessage(content=response.content)]
+    }
+
 
 
 def check_pdf_or_not(state: AgenticRAG):
