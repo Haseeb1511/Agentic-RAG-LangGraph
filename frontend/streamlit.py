@@ -20,11 +20,10 @@ app = st.session_state.graph_app
 # =========================================================== Page Title =========================================================================
 st.title("Agentic RAG Q&A")
 
-# ======================================================= User Input =============================================================================
-user_input = st.chat_input("Ask Anything....")
+# ======================================================= User Choice + PDFs Handling ============================================================
 
 # choice list
-base_choices = ["Dermatology", "Psychiatrist", "Legal"]
+base_choices = ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]
 
 # Keep track of uploaded PDFs
 if "uploaded_pdfs" not in st.session_state:
@@ -49,12 +48,60 @@ choices = base_choices + st.session_state["uploaded_pdfs"]
 # Sidebar radio includes both prebuilt and PDFs
 choice = st.sidebar.radio("Choose From Here:", choices)
 
+#===============================================================Landing Page==================================================================
+
+# Show landing page if selected
+# ================================================================Landing Page==================================================================
+if choice == "Landing Page":
+    st.markdown("<h1 style='text-align: center; color:red;'>Agentic RAG Q&A</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #6A5ACD;'>Chat intelligently with predefined knowledge bases or your own PDFs</h3>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    st.markdown("### How to use the app:")
+    st.markdown("""
+    1. Select a vector store from the sidebar or upload a PDF.
+    2. Start asking questions once a store is selected.
+    """)
+
+    st.markdown("### Explore Predefined Knowledge Bases:")
+
+    # Use columns to make it look like cards
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("<div style='text-align:center; font-size:30px;'>🩺</div>", unsafe_allow_html=True)
+        st.markdown("**Dermatology**")
+        st.markdown("Learn about skin conditions, treatments, and health advice.")
+
+    with col2:
+        st.markdown("<div style='text-align:center; font-size:30px;'>🧠</div>", unsafe_allow_html=True)
+        st.markdown("**Psychiatrist**")
+        st.markdown("Explore mental health, psychology, and therapy-related info.")
+
+    with col3:
+        st.markdown("<div style='text-align:center; font-size:30px;'>🏛️</div>", unsafe_allow_html=True)
+        st.markdown("**Legal**")
+        st.markdown("Access legal knowledge, laws, and regulations.")
+
+    st.markdown("---")
+
+    st.markdown("### Upload Your Own PDF")
+    st.markdown("You can upload any PDF document and chat with it intelligently!")
+
+    # Stop execution so chat input doesn't show
+    st.stop()
+
+
+#=======================================================user Text Input==========================================================================
+user_input = st.chat_input("Ask Anything....")
+
 # use choice as thread_id
 thread_id = choice
 CONFIG = {"configurable": {"thread_id": thread_id}}
 
 # ============================================================= Session States ===================================================================
 # It retrieve all chat messages from the "./chat_hist/chat.db"
+# graph.retrieve_all_thread() fetches all saved chat threads from the SQLite database where LangGraph stores them.
 if "chat_thread" not in st.session_state:
     st.session_state["chat_thread"] = graph.retrieve_all_thread()
 
@@ -62,7 +109,12 @@ if "chat_thread" not in st.session_state:
 
 #On restarting the Streamlit server, LangGraph reloads the messages from this SQLite database
 def load_conversation(thread_id):
-    """THis function LOAD CONVERSATION from SQLite database """
+    """It reads from the LangGraph app in-memory state for a specific thread.
+     Loads the chat history for a specific conversation thread.
+    Note:
+        This reads from the app's current in-memory state, 
+        not directly from the database.
+    """
     state = app.get_state(config={"configurable": {"thread_id": thread_id}})
     return state.values.get("messages", [])
 
@@ -81,10 +133,6 @@ for message in messages:
 
 # ============================================================ Main Chat Logic ===================================================================
 if user_input:
-    # Persist user question in LangGraph state because we are only persisting ai message through agent node
-    app.update_state(
-        config=CONFIG,
-        values={"messages": [HumanMessage(content=user_input)]})
     with st.chat_message("user"):
         st.markdown(user_input)
 
@@ -101,12 +149,12 @@ if user_input:
         }
         result = app.invoke(input_data, config=CONFIG)
 
-    # Handle Prebuilt threads
+    # Handle Prebuilt VectorStore
     else:
         vectorstore_paths = {
-            "Dermatology": "./vectorstores/dermatology_faiss",
-            "Psychiatrist": "./vectorstores/psychiatrist_faiss",
-            "Legal": "./vectorstores/legal_faiss"
+            "Dermatology🩺": "./vectorstores/dermatology_faiss",
+            "Psychiatrist🧠": "./vectorstores/psychiatrist_faiss",
+            "Legal🏛️": "./vectorstores/legal_faiss"
         }
         input_data = {
             "vectorstore_path": vectorstore_paths[thread_id],

@@ -92,24 +92,50 @@ def Retriever(state: AgenticRAG):
 
 
 
+
+
 def Agent(state: AgenticRAG):
     docs = state["retrieved_docs"]
-    doc_context = "\n\n".join([doc.page_content for doc in docs])
-
-    conversation_text = "\n".join(f"User: {m.content}" if isinstance(m,HumanMessage) else f"AI: {m.content}" for m in state.get("messages", []))
-
-    query = state["query"]
-    # Combine docs context + conversation history
-    full_context =  doc_context+ "\n\nConversation so far:\n" + conversation_text
+    context = "\n\n".join([doc.page_content for doc in docs])
+    # get last human query
+    if "messages" in state and len(state["messages"]) > 0:
+        query = state["messages"][-1].content
+    else:
+        query = state["query"]
 
     formatted_prompt = prompt_template.format(
-        context=full_context,
+        context=context,
         question=query)
     response = model.invoke(formatted_prompt)
+
+    # Save to state instead of external memory
+    state.setdefault("messages", [])
+    state["messages"].append(HumanMessage(content=state["query"]))
+    state["messages"].append(AIMessage(content=response.content))
     return {
         "answer": response.content,
-        "messages": [AIMessage(content=response.content)]
+        "messages": state["messages"]
     }
+
+
+# def Agent(state: AgenticRAG):
+#     docs = state["retrieved_docs"]
+#     doc_context = "\n\n".join([doc.page_content for doc in docs])
+
+#     conversation_text = "\n".join(f"User: {m.content}" if isinstance(m,HumanMessage) else f"AI: {m.content}" for m in state.get("messages", []))
+
+#     query = state["query"]
+#     # Combine docs context + conversation history
+#     full_context =  doc_context+ "\n\nConversation so far:\n" + conversation_text
+
+#     formatted_prompt = prompt_template.format(
+#         context=full_context,
+#         question=query)
+#     response = model.invoke(formatted_prompt)
+#     return {
+#         "answer": response.content,
+#         "messages": [AIMessage(content=response.content)]
+#     }
 
 
 

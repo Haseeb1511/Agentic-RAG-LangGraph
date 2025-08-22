@@ -1,8 +1,8 @@
 
 # My Checklist
 
-- [ ] Agentic vector store
-- [ ] memory
+- [x] Agentic vector store
+- [x] memory
 - [ ] streaming  
 
 
