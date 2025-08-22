@@ -4,6 +4,12 @@
 - [x] Agentic vector store
 - [x] memory
 - [ ] streaming  
+- [ ] nodes OOP
+- [ ] model OOP(Config)  
+- [ ] Docker
+- [ ] Fast API backend
+
+
 
 
 Full persistence: all messages stored in SQLite via LangGraph’s checkpointer.
