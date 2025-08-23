@@ -10,65 +10,56 @@ from typing import List, Dict, Any
 # FastAPI backend URL
 API_BASE_URL = "http://localhost:8000"
 
-
-# ================================================================ Helper Functions ==============================================================
-
-def make_api_request(endpoint: str, method: str = "GET", data: Dict = None, files: Dict = None):
-    """Make API request to FastAPI backend"""
-    url = f"{API_BASE_URL}/{endpoint.lstrip('/')}"
-        
-    if method == "GET":# for predefined vector store
+#================================================================== Helper Functions ========================================================
+def make_api_request(endpoint:str,method:str="GET",data:dict=None,files:Dict=None):
+    url = f"{API_BASE_URL}/{endpoint.lstrip('/')}" #remove leading whitespaces
+    if method == "GET":
         response = requests.get(url)
-    elif method == "POST": #for pdf
+    elif method == "POST":
         if files:
-            response = requests.post(url, files=files)  # for pdf post
+            response = requests.post(url,files=files)
         else:
-            response = requests.post(url, json=data)
+            response = requests.post(url,json=data)
     else:
-        raise ValueError(f"Unsupported method: {method}")
-        
+        raise ValueError(f"Unsupported method:{method} ")
+    
     if response.status_code == 200:
         return response.json()
     else:
-        st.error(f"API Error: {response.status_code} - {response.text}")
+        st.error(f"API error: {response.status_code}")
         return {}
-    
 
 
-def load_vectorstores():
-    """Load available vectorstores from API"""
+def load_vactorstores():
+    """Load Avaliable Vectorstores from the API"""
     response = make_api_request("/vectorstores")
     if response:
-        return  ["Landing Page"] + response.get("all_choices", [])
-    return ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]  # Fallback
-
+        return ["Landing Page"] + response.get("all_choices",[])
+    return ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"] #fall back
 
 def upload_pdf_to_api(uploaded_file):
     """Upload PDF to FastAPI backend"""
     #we need to send it in exact same format required by Fast API UploadFile
-    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")} 
-    response = make_api_request("/upload-pdf", method="POST", files=files)
+    files = {"file":(uploaded_file.name, uploaded_file.getvalue(),"application/pdf")}
+    response = make_api_request("/upload_pdf",method="POST",files=files)
     return response
 
-
-def send_query_to_api(query: str, thread_id: str):
-    """Send query to FastAPI backend"""
-    data = {
-        "query": query,
-        "thread_id": thread_id
-    }
-    response = make_api_request("/query", method="POST", data=data)
+def send_query_to_api(query:str,thread_id:str):
+    """SEnd query to ABckend"""
+    data = {"query":query,
+            "thread_id":thread_id}
+    response = make_api_request(endpoint="/query",method="POST",data=data)
     return response
 
-def load_chat_history(thread_id: str):
-    """Load chat history from API"""
-    response = make_api_request(f"/chat-history/{thread_id}")
+def load_chat_history(thread_id:str):
+    """Load chat histroy from backend"""
+    response = make_api_request(f"chat_history/{thread_id}")
     if response:
-        return response.get("messages", [])
+        return response.get("messages",[])
     return []
 
 
-# ============================================================= Streamlit Configuration ==========================================================
+#============================================================== Streamlit Configuration ========================================================
 
 st.set_page_config(
     page_title="Agentic RAG Q&A",
@@ -77,68 +68,67 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================================================================ Session State ==============================================================
 
-# Initialize session states
+#======================================================================= Session State ========================================================
 if "uploaded_pdfs" not in st.session_state:
     st.session_state["uploaded_pdfs"] = []
+
 if "current_thread" not in st.session_state:
-    st.session_state["current_thread"] = "Landing Page"
+    st.session_state["current_thread"] = "Landing Page" #default we will show landing page
+
 if "api_connected" not in st.session_state:
-    # Test API connection
-    health_check = make_api_request("/")
-    st.session_state["api_connected"] = bool(health_check)
+    health_Check = make_api_request("/")
+    st.session_state["api_connected"] = bool(health_Check)
+
 
 # ================================================================ Sidebar ==============================================================
 
 st.sidebar.title("🤖 Agentic RAG Q&A")
 
-# API Status
+#API status
 if st.session_state["api_connected"]:
-    st.sidebar.success("✅ API Connected")
+    st.sidebar.success("API Connected")
 else:
-    st.sidebar.error("❌ API Disconnected")
-    st.sidebar.write("Please start FastAPI server: `uvicorn app:app --reload`")
+    st.sidebar.error("API DIsconnected")
 
 # PDF Upload
 st.sidebar.header("📄 Upload PDF")
-uploaded_pdf = st.sidebar.file_uploader("Upload PDF here to Chat with it", type=['pdf'])
-
+uploaded_pdf = st.sidebar.file_uploader("Upload pDF to chat with them",type=["PDF"])
 if uploaded_pdf and st.session_state["api_connected"]:
     filename_no_ext = Path(uploaded_pdf.name).stem
     pdf_choice = f"PDF_{filename_no_ext}"
-    
+
     if pdf_choice not in st.session_state["uploaded_pdfs"]:
-        with st.spinner("Uploading PDF..."):
-            upload_response = upload_pdf_to_api(uploaded_pdf)
-            
-        if upload_response:
+        with st.spinner("Uploading PDF...."):
+            uploaded_response = upload_pdf_to_api(uploaded_file=uploaded_pdf)
+
+        if uploaded_response:
             st.session_state["uploaded_pdfs"].append(pdf_choice)
-            st.sidebar.success(f"✅ {uploaded_pdf.name} uploaded!")
+            st.sidebar.success(f"{uploaded_pdf.name} uploaded!")
         else:
-            st.sidebar.error("❌ Failed to upload PDF")
+            st.sidebar.error("Failed to Upload PDF")
 
-
-# Load available choices
+#Load avaliable chice
 if st.session_state["api_connected"]:
-    all_choices = load_vectorstores()
+    all_choices = load_vactorstores()
 else:
-    all_choices = ["Landing Page", "Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]
+    all_choices = ["Landing Page", "Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"] #fallback
 
-# Choice selection
-st.sidebar.header("📂Choose Knowledge Base")
-choice = st.sidebar.radio("Select from:", all_choices)
+#choice selection
+st.sidebar.header("Chose Knowledge Base")
+choice=  st.sidebar.radio("Select from",all_choices)
+
 
 # Update current thread when choice changes
 if choice != st.session_state["current_thread"]:
     st.session_state["current_thread"] = choice
 
-# ================================================================ Main Page ==============================================================
 
-# Page Title
+#========================================================== Title ==============================================================================
+
 st.title("🤖 Agentic RAG Q&A")
 
-# Landing Page
+#======================================================================== landing Page ==========================================================
 if choice == "Landing Page":
     st.markdown("<h1 style='text-align: center; color:red;'>Agentic RAG Q&A</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; color: #6A5ACD;'>Chat intelligently with predefined knowledge bases or your own PDFs</h3>", unsafe_allow_html=True)
@@ -208,7 +198,7 @@ if choice == "Landing Page":
 
     st.stop()
 
-# ================================================================ Chat Interface ==============================================================
+# ================================================================ Load Chat History ===========================================================
 
 # Only show chat if API is connected and not on landing page
 if not st.session_state["api_connected"]:
@@ -218,19 +208,19 @@ if not st.session_state["api_connected"]:
 # Display current knowledge base
 st.subheader(f"💬 Chatting with: {choice}")
 
-# Load and display chat history
 thread_id = choice
-messages = load_chat_history(thread_id)
+messages = load_chat_history(thread_id=thread_id)
 
 for message in messages:
-    role = message["role"] if isinstance(message, dict) else message.role
-    content = message["content"] if isinstance(message, dict) else message.content
-    
+    role  = message["role"] if isinstance(message,dict) else message.role
+    content = message["content"] if isinstance(message,dict) else message.content
+
     with st.chat_message(role):
         st.markdown(content)
 
-# Chat input
-user_input = st.chat_input("Ask anything...")
+ # ============================================================== User input ===================================================================
+
+user_input = st.chat_input("Ask anything ....")
 
 if user_input:
     # Display user message
@@ -239,15 +229,16 @@ if user_input:
     
     # Send query to API and get response
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = send_query_to_api(user_input, thread_id)
-        
+        with st.spinner("Thinking...."):
+            response = send_query_to_api(query=user_input,thread_id=thread_id)
+
         if response and "answer" in response:
             st.markdown(response["answer"])
         else:
-            st.error("Sorry, I couldn't process your question. Please try again.")
+            st.error("Sorry i could not process your query")
 
-# ================================================================ Sidebar Additional Options ==============================================================
+    
+# ============================================================== Sidebar Additional Options ===================================================
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Options")
@@ -256,21 +247,6 @@ st.sidebar.header("⚙️ Options")
 if st.sidebar.button("🔄 Refresh"):
     st.rerun()
 
-# Clear chat button
-if st.sidebar.button("🗑️ Clear Chat History"):
-    st.warning("Chat history clearing not implemented yet")
-
-# # Show uploaded PDFs
-# if st.session_state["uploaded_pdfs"]:
-#     st.sidebar.header("📎 Uploaded PDFs")
-#     for pdf in st.session_state["uploaded_pdfs"]:
-#         pdf = pdf.replace("PDF_", "")
-#         st.sidebar.text(f"• {pdf}")
-
-# # Footer
-# st.sidebar.markdown("---")
-# st.sidebar.markdown("""
-# <div style='text-align: center; color: #666; font-size: 12px;'>
-#     Made with ❤️ using FastAPI + Streamlit by Haseeb
-# </div>
-# """, unsafe_allow_html=True)
+# # Clear chat button
+# if st.sidebar.button("🗑️ Clear Chat History"):
+#     st.warning("Chat history clearing not implemented yet")
