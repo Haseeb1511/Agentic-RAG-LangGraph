@@ -1,11 +1,27 @@
-
-from src.all_nodes.nodes import Document_Loader,Text_Splitter,Create_Vector_Store,Load_Vector_Store,Retriever,Agent,check_pdf_or_not,AgenticRAG
 from src.agent.model_loader import model
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 from langgraph.graph import StateGraph,START,END
 import os
+
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from src.all_nodes.nodes import GraphNodes,AgenticRAG
+
+
+# this line for google embedding as it require running event loop
+# GoogleGenerativeAIEmbeddings internally initializes a gRPC async client.
+# Streamlit runs your script in a separate thread (ScriptRunner.scriptThread), where no asyncio loop is set by default.
+# So when gRPC tries to grab the current event loop → it crashes with
+# RuntimeError: There is no current event loop in thread 'ScriptRunner.scriptThread'.
+import asyncio
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+nodes = GraphNodes(GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+
 
 class GraphBuilder:
     def __init__(self):
@@ -18,14 +34,14 @@ class GraphBuilder:
     def build_graph(self):
         graph = StateGraph(AgenticRAG)
 
-        graph.add_node("Document_Loader",Document_Loader,)
-        graph.add_node("Text_Splitter",Text_Splitter)
-        graph.add_node("Create_Vector_Store",Create_Vector_Store)
-        graph.add_node("Load_Vector_Store",Load_Vector_Store)  
-        graph.add_node("Retriever",Retriever)
-        graph.add_node("Agent",Agent)
+        graph.add_node("Document_Loader",nodes.Document_Loader,)
+        graph.add_node("Text_Splitter",nodes.Text_Splitter)
+        graph.add_node("Create_Vector_Store",nodes.Create_Vector_Store)
+        graph.add_node("Load_Vector_Store",nodes.Load_Vector_Store)  
+        graph.add_node("Retriever",nodes.Retriever)
+        graph.add_node("Agent",nodes.Agent)
         #Conditional Edge
-        graph.add_conditional_edges(START,check_pdf_or_not,{"create":"Document_Loader",
+        graph.add_conditional_edges(START,nodes.check_pdf_or_not,{"create":"Document_Loader",
                                                             "load":"Load_Vector_Store"})
 
         # If new Vectorstore

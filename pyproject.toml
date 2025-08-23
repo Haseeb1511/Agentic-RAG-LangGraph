@@ -12,6 +12,7 @@ dev = [
     "aiosqlite>=0.21.0",
     "cryptography>=45.0.6",
     "faiss-cpu>=1.12.0",
+    "fastapi>=0.116.1",
     "ipykernel>=6.30.1",
     "langchain-community>=0.3.27",
     "langchain-google-genai>=2.1.9",

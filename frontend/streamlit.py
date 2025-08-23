@@ -1,175 +1,276 @@
-import sys,os
-# Add project root to sys.path to import local modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import streamlit as st
-from src.agent.agentic_workflow import GraphBuilder
+import requests
+import json
 from pathlib import Path
+from typing import List, Dict, Any
 
-from langchain_core.messages import HumanMessage,AIMessage
 
-# ================================================================ Build Graph Once ==============================================================
-if "graph_builder" not in st.session_state:
-    st.session_state.graph_builder = GraphBuilder()
-if "graph_app" not in st.session_state:
-    st.session_state.graph_app = st.session_state.graph_builder.build_graph()
+# ================================================================ Configuration ==============================================================
 
-graph = st.session_state.graph_builder
-app = st.session_state.graph_app
+# FastAPI backend URL
+API_BASE_URL = "http://localhost:8000"
 
-# =========================================================== Page Title =========================================================================
-st.title("Agentic RAG Q&A")
 
-# ======================================================= User Choice + PDFs Handling ============================================================
+# ================================================================ Helper Functions ==============================================================
 
-# choice list
-base_choices = ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]
+def make_api_request(endpoint: str, method: str = "GET", data: Dict = None, files: Dict = None):
+    """Make API request to FastAPI backend"""
+    url = f"{API_BASE_URL}/{endpoint.lstrip('/')}"
+        
+    if method == "GET":# for predefined vector store
+        response = requests.get(url)
+    elif method == "POST": #for pdf
+        if files:
+            response = requests.post(url, files=files)  # for pdf post
+        else:
+            response = requests.post(url, json=data)
+    else:
+        raise ValueError(f"Unsupported method: {method}")
+        
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"API Error: {response.status_code} - {response.text}")
+        return {}
+    
 
-# Keep track of uploaded PDFs
+
+def load_vectorstores():
+    """Load available vectorstores from API"""
+    response = make_api_request("/vectorstores")
+    if response:
+        return  ["Landing Page"] + response.get("all_choices", [])
+    return ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]  # Fallback
+
+
+def upload_pdf_to_api(uploaded_file):
+    """Upload PDF to FastAPI backend"""
+    #we need to send it in exact same format required by Fast API UploadFile
+    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")} 
+    response = make_api_request("/upload-pdf", method="POST", files=files)
+    return response
+
+
+def send_query_to_api(query: str, thread_id: str):
+    """Send query to FastAPI backend"""
+    data = {
+        "query": query,
+        "thread_id": thread_id
+    }
+    response = make_api_request("/query", method="POST", data=data)
+    return response
+
+def load_chat_history(thread_id: str):
+    """Load chat history from API"""
+    response = make_api_request(f"/chat-history/{thread_id}")
+    if response:
+        return response.get("messages", [])
+    return []
+
+
+# ============================================================= Streamlit Configuration ==========================================================
+
+st.set_page_config(
+    page_title="Agentic RAG Q&A",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ================================================================ Session State ==============================================================
+
+# Initialize session states
 if "uploaded_pdfs" not in st.session_state:
     st.session_state["uploaded_pdfs"] = []
+if "current_thread" not in st.session_state:
+    st.session_state["current_thread"] = "Landing Page"
+if "api_connected" not in st.session_state:
+    # Test API connection
+    health_check = make_api_request("/")
+    st.session_state["api_connected"] = bool(health_check)
 
-uploaded_pdf = st.sidebar.file_uploader("Upload PDF here to Chat with it")
+# ================================================================ Sidebar ==============================================================
 
-# Add uploaded PDF dynamically to choices
-if uploaded_pdf:
+st.sidebar.title("🤖 Agentic RAG Q&A")
+
+# API Status
+if st.session_state["api_connected"]:
+    st.sidebar.success("✅ API Connected")
+else:
+    st.sidebar.error("❌ API Disconnected")
+    st.sidebar.write("Please start FastAPI server: `uvicorn app:app --reload`")
+
+# PDF Upload
+st.sidebar.header("📄 Upload PDF")
+uploaded_pdf = st.sidebar.file_uploader("Upload PDF here to Chat with it", type=['pdf'])
+
+if uploaded_pdf and st.session_state["api_connected"]:
     filename_no_ext = Path(uploaded_pdf.name).stem
     pdf_choice = f"PDF_{filename_no_ext}"
-
+    
     if pdf_choice not in st.session_state["uploaded_pdfs"]:
-        # Save the file temporarily so it can be reused
-        temp_pdf_path = f"./temp_{uploaded_pdf.name}"
-        with open(temp_pdf_path, "wb") as f:
-            f.write(uploaded_pdf.getbuffer())
-        st.session_state["uploaded_pdfs"].append(pdf_choice)
+        with st.spinner("Uploading PDF..."):
+            upload_response = upload_pdf_to_api(uploaded_pdf)
+            
+        if upload_response:
+            st.session_state["uploaded_pdfs"].append(pdf_choice)
+            st.sidebar.success(f"✅ {uploaded_pdf.name} uploaded!")
+        else:
+            st.sidebar.error("❌ Failed to upload PDF")
 
-choices = base_choices + st.session_state["uploaded_pdfs"]
 
-# Sidebar radio includes both prebuilt and PDFs
-choice = st.sidebar.radio("Choose From Here:", choices)
+# Load available choices
+if st.session_state["api_connected"]:
+    all_choices = load_vectorstores()
+else:
+    all_choices = ["Landing Page", "Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"]
 
-#===============================================================Landing Page==================================================================
+# Choice selection
+st.sidebar.header("📂Choose Knowledge Base")
+choice = st.sidebar.radio("Select from:", all_choices)
 
-# Show landing page if selected
-# ================================================================Landing Page==================================================================
+# Update current thread when choice changes
+if choice != st.session_state["current_thread"]:
+    st.session_state["current_thread"] = choice
+
+# ================================================================ Main Page ==============================================================
+
+# Page Title
+st.title("🤖 Agentic RAG Q&A")
+
+# Landing Page
 if choice == "Landing Page":
     st.markdown("<h1 style='text-align: center; color:red;'>Agentic RAG Q&A</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; color: #6A5ACD;'>Chat intelligently with predefined knowledge bases or your own PDFs</h3>", unsafe_allow_html=True)
     st.markdown("---")
 
-    st.markdown("### How to use the app:")
-    st.markdown("""
-    1. Select a vector store from the sidebar or upload a PDF.
-    2. Start asking questions once a store is selected.
-    """)
+    # Architecture Info
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🏗️ Architecture")
+        st.markdown("""
+        - **FastAPI Backend**: Handles AI processing and data management
+        - **Streamlit Frontend**: Provides user interface
+        - **Agentic RAG**: Intelligent document retrieval and generation
+        """)
+    
+    with col2:
+        st.markdown("### 🚀 How to use:")
+        st.markdown("""
+        1. Ensure FastAPI server is running
+        2. Select a knowledge base or upload PDF
+        3. Start asking questions
+        """)
 
-    st.markdown("### Explore Predefined Knowledge Bases:")
+    st.markdown("---")
+    st.markdown("### 📚 Explore Predefined Knowledge Bases:")
 
-    # Use columns to make it look like cards
+    # Knowledge base cards
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("<div style='text-align:center; font-size:30px;'>🩺</div>", unsafe_allow_html=True)
-        st.markdown("**Dermatology**")
-        st.markdown("Learn about skin conditions, treatments, and health advice.")
+        st.markdown("""
+        <div style='text-align:center; padding: 20px; border: 1px solid #ddd; border-radius: 10px; margin: 10px;'>
+            <div style='font-size:50px;'>🩺</div>
+            <h3>Dermatology</h3>
+            <p>Learn about skin conditions, treatments, and health advice.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown("<div style='text-align:center; font-size:30px;'>🧠</div>", unsafe_allow_html=True)
-        st.markdown("**Psychiatrist**")
-        st.markdown("Explore mental health, psychology, and therapy-related info.")
+        st.markdown("""
+        <div style='text-align:center; padding: 20px; border: 1px solid #ddd; border-radius: 10px; margin: 10px;'>
+            <div style='font-size:50px;'>🧠</div>
+            <h3>Psychiatrist</h3>
+            <p>Explore mental health, psychology, and therapy-related info.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col3:
-        st.markdown("<div style='text-align:center; font-size:30px;'>🏛️</div>", unsafe_allow_html=True)
-        st.markdown("**Legal**")
-        st.markdown("Access legal knowledge, laws, and regulations.")
+        st.markdown("""
+        <div style='text-align:center; padding: 20px; border: 1px solid #ddd; border-radius: 10px; margin: 10px;'>
+            <div style='font-size:50px;'>🏛️</div>
+            <h3>Legal</h3>
+            <p>Access legal knowledge, laws, and regulations.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
+    st.markdown("### 📎 Upload Your Own PDF")
+    st.markdown("You can upload any PDF document and chat with it intelligently using the sidebar!")
+    
+    # API Status Details
+    if st.session_state["api_connected"]:
+        st.success("🟢 FastAPI Backend is connected and ready!")
+    else:
+        st.error("🔴 FastAPI Backend is not running. Please start it with: `uvicorn main:app --reload`")
 
-    st.markdown("### Upload Your Own PDF")
-    st.markdown("You can upload any PDF document and chat with it intelligently!")
-
-    # Stop execution so chat input doesn't show
     st.stop()
 
+# ================================================================ Chat Interface ==============================================================
 
-#=======================================================user Text Input==========================================================================
-user_input = st.chat_input("Ask Anything....")
+# Only show chat if API is connected and not on landing page
+if not st.session_state["api_connected"]:
+    st.error("🚫 Cannot start chat without API connection. Please start the FastAPI backend.")
+    st.stop()
 
-# use choice as thread_id
+# Display current knowledge base
+st.subheader(f"💬 Chatting with: {choice}")
+
+# Load and display chat history
 thread_id = choice
-CONFIG = {"configurable": {"thread_id": thread_id}}
+messages = load_chat_history(thread_id)
 
-# ============================================================= Session States ===================================================================
-# It retrieve all chat messages from the "./chat_hist/chat.db"
-# graph.retrieve_all_thread() fetches all saved chat threads from the SQLite database where LangGraph stores them.
-if "chat_thread" not in st.session_state:
-    st.session_state["chat_thread"] = graph.retrieve_all_thread()
-
-# ============================================================ Display History ===================================================================
-
-#On restarting the Streamlit server, LangGraph reloads the messages from this SQLite database
-def load_conversation(thread_id):
-    """It reads from the LangGraph app in-memory state for a specific thread.
-     Loads the chat history for a specific conversation thread.
-    Note:
-        This reads from the app's current in-memory state, 
-        not directly from the database.
-    """
-    state = app.get_state(config={"configurable": {"thread_id": thread_id}})
-    return state.values.get("messages", [])
-
-messages = load_conversation(thread_id)
 for message in messages:
-    if isinstance(message, HumanMessage):
-        role = "user"
-    elif isinstance(message, AIMessage):
-        role = "assistant"
-    else:
-        role = "system"
-
+    role = message["role"] if isinstance(message, dict) else message.role
+    content = message["content"] if isinstance(message, dict) else message.content
+    
     with st.chat_message(role):
-        st.markdown(message.content)
+        st.markdown(content)
 
+# Chat input
+user_input = st.chat_input("Ask anything...")
 
-# ============================================================ Main Chat Logic ===================================================================
 if user_input:
+    # Display user message
     with st.chat_message("user"):
         st.markdown(user_input)
+    
+    # Send query to API and get response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = send_query_to_api(user_input, thread_id)
+        
+        if response and "answer" in response:
+            st.markdown(response["answer"])
+        else:
+            st.error("Sorry, I couldn't process your question. Please try again.")
 
-    result = None
+# ================================================================ Sidebar Additional Options ==============================================================
 
-    # Handle PDF threads
-    if thread_id.startswith("PDF_"):
-        filename_no_ext = thread_id.replace("PDF_", "")
-        temp_pdf_path = f"./temp_{filename_no_ext}.pdf"
-        input_data = {
-            "documents_path": temp_pdf_path,
-            "vectorstore_path": f"../Vectorstores/{filename_no_ext}/",
-            "query": user_input
-        }
-        result = app.invoke(input_data, config=CONFIG)
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Options")
 
-    # Handle Prebuilt VectorStore
-    else:
-        vectorstore_paths = {
-            "Dermatology🩺": "./vectorstores/dermatology_faiss",
-            "Psychiatrist🧠": "./vectorstores/psychiatrist_faiss",
-            "Legal🏛️": "./vectorstores/legal_faiss"
-        }
-        input_data = {
-            "vectorstore_path": vectorstore_paths[thread_id],
-            "query": user_input
-        }
-        result = app.invoke(input_data, config=CONFIG)
+# Refresh button
+if st.sidebar.button("🔄 Refresh"):
+    st.rerun()
 
-    # Display AI response
-    if result:
-        ai_response = result["answer"]
+# Clear chat button
+if st.sidebar.button("🗑️ Clear Chat History"):
+    st.warning("Chat history clearing not implemented yet")
 
-        with st.chat_message("assistant"):
-            st.markdown(ai_response)
+# # Show uploaded PDFs
+# if st.session_state["uploaded_pdfs"]:
+#     st.sidebar.header("📎 Uploaded PDFs")
+#     for pdf in st.session_state["uploaded_pdfs"]:
+#         pdf = pdf.replace("PDF_", "")
+#         st.sidebar.text(f"• {pdf}")
 
-# ========================== Save Graph as PNG ==================================================================================================
-graph_png = app.get_graph().draw_mermaid_png()
-with open("graph.png", "wb") as f:
-    f.write(graph_png)
+# # Footer
+# st.sidebar.markdown("---")
+# st.sidebar.markdown("""
+# <div style='text-align: center; color: #666; font-size: 12px;'>
+#     Made with ❤️ using FastAPI + Streamlit by Haseeb
+# </div>
+# """, unsafe_allow_html=True)
