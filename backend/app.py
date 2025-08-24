@@ -3,21 +3,28 @@
 
 from fastapi import FastAPI,HTTPException,UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel,Field
-from typing import List,Optional
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 import os,sys
-from langchain_core.messages import HumanMessage,AIMessage,BaseMessage,SystemMessage
+from langchain_core.messages import HumanMessage,AIMessage
 from src.agent.agentic_workflow import GraphBuilder
 
 import shutil  #It is mainly used for copying, moving, archiving, and deleting files or directories.  better than OS module
-import tempfile
 from pathlib import Path
 
 # Add project root to sys.path to import local modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 app = FastAPI(title="Agentic RAG Backend")
+
+# Add CORS middleware to allow requests from any origin
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class QueryRequest(BaseModel):
@@ -80,6 +87,10 @@ def load_conversation(thread_id:str):
 # file: an internal SpooledTemporaryFile (file-like object you can .read(), .write(), .seek()).---->upload_file.getvalue()
 @app.post("/upload_pdf")
 async def upload_pdf(file: UploadFile): # #upload file is built in fast api validator
+    """This function save the uploaded pdf file to temp folder
+    and inside dict like {"pdf_path":"path to pdf"
+                            "vectorstore_path":"path to vectorstore"}
+    """
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400,detail="only pdf are allowed")
     
@@ -95,8 +106,8 @@ async def upload_pdf(file: UploadFile): # #upload file is built in fast api vali
     with open (temp_pdf_path,"wb") as f:
         shutil.copyfileobj(file.file,f) #copy data chunk by chunk in to temp_pdf_path
 
-    # store uploaded file in dictionary
-    uploaded_pdfs_store[pdf_choice] = str(temp_pdf_path)  # we create a disctionary like {"dermatolgy.pdf":"./temp_pdf/dermatology.pdf"}
+    # Store in our tracking dictionary       [[we only store PDF path no vectorstore path is needed here]]
+    uploaded_pdfs_store[pdf_choice] = str(temp_pdf_path)
 
     return {
         "message":"Pdf uploaded successfully",
@@ -117,24 +128,29 @@ async def get_vectorstores():
     }
 
 
+
 @app.post("/query",response_model=QueryResponse)
 async def process_query(request:QueryRequest):
+    """This function let user chat with PDF + Vectorstores"""
     thread_id = request.thread_id   # first we get thread(choice) which we want to send our query to
     CONFIG = {"configurable":{"thread_id":thread_id}}
+
     # Handling PDF thread
     if thread_id.startswith("PDF_"):
-        filename_no_ext = thread_id.replace("PDF_","")
-        temp_pdf_path = uploaded_pdfs_store[thread_id] # we get path for our pdf path from our uploaded_pdfs_store dict
+        filename_no_ext = thread_id.replace("PDF_", "")
+        temp_pdf_path = uploaded_pdfs_store[thread_id]  # we will use thread id to access that specific pdf path from above [uploaded_pdf_store]
+        
         input_data = {
-            "document_path":temp_pdf_path,
-            "vectorstore_path":f"vectorstores/pdf_vectorstores/{filename_no_ext}/",
-            "query":request.query
-        }
+        "documents_path": temp_pdf_path,
+        "vectorstore_path": f"./Vectorstores/{filename_no_ext}/",
+        "query": request.query}
+                    
     else:
         input_data = {
             "vectorstore_path":VECTORSTORE_PATHS[thread_id],
             "query":request.query
         }
+
     result = workflow.invoke(input_data,config=CONFIG)
 
     if not result or "answer" not in result:

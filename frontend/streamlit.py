@@ -1,14 +1,14 @@
 import streamlit as st
 import requests
-import json
 from pathlib import Path
-from typing import List, Dict, Any
-
+from typing import Dict
+import os
 
 # ================================================================ Configuration ==============================================================
 
 # FastAPI backend URL
-API_BASE_URL = "http://localhost:8000"
+# API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.environ.get("API_URL", "http://localhost:8000")  # for server (aws)or docker compose this work
 
 #================================================================== Helper Functions ========================================================
 def make_api_request(endpoint:str,method:str="GET",data:dict=None,files:Dict=None):

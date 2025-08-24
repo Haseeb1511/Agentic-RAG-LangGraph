@@ -20,8 +20,19 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-nodes = GraphNodes(GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
 
+#setting up ENV variable
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+env_path = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=env_path)
+google_api = os.getenv("GOOGLE_API_KEY")
+
+# from dotenv import load_dotenv
+# load_dotenv()
+
+nodes = GraphNodes(GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
 
 class GraphBuilder:
     def __init__(self):

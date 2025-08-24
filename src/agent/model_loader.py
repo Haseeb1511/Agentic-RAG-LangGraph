@@ -6,20 +6,19 @@ from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from pathlib import Path
 import os
-load_dotenv()
+env_path = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=env_path)
+
+groq_api = os.getenv("GROQ_API_KEY")
+openai_api = os.getenv("OPENAI_API_KEY")
 
 
-#load .env from root folder
-# env_path = Path(__file__).resolve().parents[1] / ".env"
-# load_dotenv(dotenv_path=env_path)
-
-# groq_api = os.getenv("GROQ_API_KEY")
-# openai_api = os.getenv("OPENAI_API_KEY")
-
-
+# from dotenv import load_dotenv
+# load_dotenv()
 
 # model = ChatOpenAI(model="gpt-4.1-nano")
 model = ChatGroq(model="Llama-3.3-70B-Versatile")
+
 
 print("Success")
 

@@ -5,7 +5,6 @@ langchain-community
 langchain_google_genai
 faiss-cpu
 
-ipykernel
 python-dotenv
 pypdf
 cryptography
@@ -13,11 +12,7 @@ pillow
 langgraph-checkpoint-sqlite
 
 aiosqlite
-
-streamlit
-fastapi
 uvicorn[standard]
+python-multipart
 
-
-
--e .
+fastapi
