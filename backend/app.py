@@ -1,6 +1,5 @@
 #hreads in this project  Uploaded pdf,Legal🏛️Psychiatrist🧠,Dermatology🩺
 
-
 from fastapi import FastAPI,HTTPException,UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,7 +14,10 @@ from pathlib import Path
 # Add project root to sys.path to import local modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+#===============================================================Fast API Object==============================================================
 app = FastAPI(title="Agentic RAG Backend")
+
+#============================================================= Hanlde Request from Any Origin ====================================================
 
 # Add CORS middleware to allow requests from any origin
 app.add_middleware(
@@ -26,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+#=================================================================== Model(Schema) =============================================================
 class QueryRequest(BaseModel):
     query:str
     thread_id:str
@@ -45,41 +47,29 @@ class ChatHistoryResponse(BaseModel):
     messages : list[ChatMessage]
 
 
+#=================================================== Health Check EndPoint ===============================================================
+
 @app.get("/")
 async def root():
     return {"message":"ai agent is running"}
+#================================================== Graph Builder(src/agent/agentic_workflow.py) ===================================
 
 graph = GraphBuilder()
 workflow = graph.build_graph()
 
+#============================================== Dict to Store Uploaded PDF path ===============================================
 
-uploaded_pdfs_store = {}
-
+uploaded_pdfs_store = {}  # {"PDF_my_resume": "./temp_pdfs/PDF_my_resume.pdf"}
+ 
+#===============================================Pre Defined Vector Store Path =========================================================
+ 
 VECTORSTORE_PATHS = {
     "Dermatology🩺": "./vectorstores/dermatology_faiss",
     "Psychiatrist🧠": "./vectorstores/psychiatrist_faiss",
     "Legal🏛️": "./vectorstores/legal_faiss"
 }
-
-
-#step 1: load conversation from sqlite.db
-#step2 :  handle upload pdf
-
-def load_conversation(thread_id:str):
-    state = workflow.get_state(config={"configurable":{"thread_id":thread_id}})
-    messages = state.values.get("messages",[])
-    chat_messages = []
-    for message in messages:
-        if isinstance(message,HumanMessage):
-            role = "user"
-        elif isinstance(message,AIMessage):
-            role="assistant"
-        else:
-            role="system"
-        chat_messages.append(ChatMessage(role=role,content=message.content))
-    return chat_messages
     
-
+#============================================================ Hanlde Uploaaded PDF ==============================================================
 
 # UploadFile has these attributes:
 # filename: original file name from the client.  --->uploade_file.name
@@ -87,9 +77,12 @@ def load_conversation(thread_id:str):
 # file: an internal SpooledTemporaryFile (file-like object you can .read(), .write(), .seek()).---->upload_file.getvalue()
 @app.post("/upload_pdf")
 async def upload_pdf(file: UploadFile): # #upload file is built in fast api validator
-    """This function save the uploaded pdf file to temp folder
-    and inside dict like {"pdf_path":"path to pdf"
-                            "vectorstore_path":"path to vectorstore"}
+    """This function save the uploaded pdf file to temp folder and store the pdf path in [uploaded_pdf_store] dict
+
+    uploaded_pdfs_store = {
+    "PDF_my_resume": "./temp_pdfs/PDF_my_resume.pdf"
+                    }
+
     """
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400,detail="only pdf are allowed")
@@ -116,6 +109,7 @@ async def upload_pdf(file: UploadFile): # #upload file is built in fast api vali
     }
 
 
+#========================================================= Get Vectorstore including pdf ====================================================
 @app.get("/vectorstores")
 async def get_vectorstores():
     "Get List of Avaliable Vectorstore"
@@ -128,7 +122,7 @@ async def get_vectorstores():
     }
 
 
-
+#====================================================hanle User Query for Both Scenerio =========================================================
 @app.post("/query",response_model=QueryResponse)
 async def process_query(request:QueryRequest):
     """This function let user chat with PDF + Vectorstores"""
@@ -160,6 +154,23 @@ async def process_query(request:QueryRequest):
         thread_id=thread_id
     )
         
+#===========================================Load Past history from the DB ==============================================================
+
+#we load conversation for 1 chat(thread) at a time
+def load_conversation(thread_id:str):
+    state = workflow.get_state(config={"configurable":{"thread_id":thread_id}}) #Get Already store messages
+    messages = state.values.get("messages",[])
+    chat_messages = []
+    for message in messages:
+        if isinstance(message,HumanMessage):
+            role = "user"
+        elif isinstance(message,AIMessage):
+            role="assistant"
+        else:
+            role="system"
+        chat_messages.append(ChatMessage(role=role,content=message.content))
+    return chat_messages
+
 
 # load past history from DB
 @app.get("/chat_history/{thread_id}",response_model=ChatHistoryResponse)
@@ -168,22 +179,26 @@ async def get_chat_history(thread_id:str):
     messages = load_conversation(thread_id=thread_id)
     return ChatHistoryResponse (messages = messages)
 
+#============================================================= Downlaod the Graph(FOr Future USe) ================================================
+from fastapi.responses import FileResponse
 
+# With BytesIO, Streamlit can render it from memory
+# With FileResponse, FastAPI sends the image file itself
 app.get("/graph-visualization")
 async def get_graph_visualization():
     """Generate and return graph visualization"""
     graph_png = workflow.get_graph().draw_mermaid_png()
         
     # Save graph visualization
-    graph_path = Path("graph.png")
+    graph_path = Path("./graph.png")
     with open(graph_path, "wb") as f:
         f.write(graph_png)
-        
-    return {"message": "Graph visualization saved as graph.png"}
+    return FileResponse(path=graph_path, media_type="image/png", filename="graph.png")
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
 
 # uvicorn <module_name>:<app_instance> [options]
 #uvicorn backend.app:app --reload

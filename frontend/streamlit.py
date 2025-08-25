@@ -8,7 +8,7 @@ import os
 
 # FastAPI backend URL
 # API_BASE_URL = "http://localhost:8000"
-API_BASE_URL = os.environ.get("API_URL", "http://localhost:8000")  # for server (aws)or docker compose this work
+API_BASE_URL = os.environ.get("API_URL", "http://localhost:8000")  # for server (aws) or docker compose this work
 
 #================================================================== Helper Functions ========================================================
 def make_api_request(endpoint:str,method:str="GET",data:dict=None,files:Dict=None):
@@ -37,6 +37,7 @@ def load_vactorstores():
         return ["Landing Page"] + response.get("all_choices",[])
     return ["Landing Page","Dermatology🩺", "Psychiatrist🧠", "Legal🏛️"] #fall back
 
+
 def upload_pdf_to_api(uploaded_file):
     """Upload PDF to FastAPI backend"""
     #we need to send it in exact same format required by Fast API UploadFile
@@ -44,12 +45,14 @@ def upload_pdf_to_api(uploaded_file):
     response = make_api_request("/upload_pdf",method="POST",files=files)
     return response
 
+
 def send_query_to_api(query:str,thread_id:str):
     """SEnd query to ABckend"""
     data = {"query":query,
             "thread_id":thread_id}
     response = make_api_request(endpoint="/query",method="POST",data=data)
     return response
+
 
 def load_chat_history(thread_id:str):
     """Load chat histroy from backend"""
@@ -91,6 +94,7 @@ if st.session_state["api_connected"]:
 else:
     st.sidebar.error("API DIsconnected")
 
+# ============================================================================== Upload PDF =====================================================
 # PDF Upload
 st.sidebar.header("📄 Upload PDF")
 uploaded_pdf = st.sidebar.file_uploader("Upload pDF to chat with them",type=["PDF"])
@@ -108,6 +112,7 @@ if uploaded_pdf and st.session_state["api_connected"]:
         else:
             st.sidebar.error("Failed to Upload PDF")
 
+# ======================================================== load Avaliable Choices after upload PDF ============================
 #Load avaliable chice
 if st.session_state["api_connected"]:
     all_choices = load_vactorstores()
@@ -118,7 +123,7 @@ else:
 st.sidebar.header("Chose Knowledge Base")
 choice=  st.sidebar.radio("Select from",all_choices)
 
-
+#===================================== Make sure that current thread is same as Choice ====================================================
 # Update current thread when choice changes
 if choice != st.session_state["current_thread"]:
     st.session_state["current_thread"] = choice
@@ -237,7 +242,6 @@ if user_input:
         else:
             st.error("Sorry i could not process your query")
 
-    
 # ============================================================== Sidebar Additional Options ===================================================
 
 st.sidebar.markdown("---")
@@ -250,3 +254,4 @@ if st.sidebar.button("🔄 Refresh"):
 # # Clear chat button
 # if st.sidebar.button("🗑️ Clear Chat History"):
 #     st.warning("Chat history clearing not implemented yet")
+

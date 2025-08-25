@@ -16,6 +16,7 @@ openai_api = os.getenv("OPENAI_API_KEY")
 # from dotenv import load_dotenv
 # load_dotenv()
 
+
 # model = ChatOpenAI(model="gpt-4.1-nano")
 model = ChatGroq(model="Llama-3.3-70B-Versatile")
 
