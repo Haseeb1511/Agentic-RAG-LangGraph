@@ -1,13 +1,11 @@
-from src.agent.model_loader import model
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 from langgraph.graph import StateGraph,START,END
 import os
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from src.all_nodes.nodes import GraphNodes,AgenticRAG
-
+from src.agent.model_loader import summary_llm,reranker_llm,EMBEDDER
 
 # this line for google embedding as it require running event loop
 # GoogleGenerativeAIEmbeddings internally initializes a gRPC async client.
@@ -32,7 +30,9 @@ google_api = os.getenv("GOOGLE_API_KEY")
 # from dotenv import load_dotenv
 # load_dotenv()
 
-nodes = GraphNodes(GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+nodes = GraphNodes(embedding_model=EMBEDDER, # GoogleGenerativeAIEmbeddings
+                   summary_llm=summary_llm,   # ChatOpenAI
+                   reranker_model=reranker_llm) # CohereRerank
 
 class GraphBuilder:
     def __init__(self):
@@ -41,6 +41,7 @@ class GraphBuilder:
         conn = sqlite3.connect(database=db_path, check_same_thread=False)
         self.checkpointer = SqliteSaver(conn=conn)
         self.app = None
+
 
     def build_graph(self):
         graph = StateGraph(AgenticRAG)

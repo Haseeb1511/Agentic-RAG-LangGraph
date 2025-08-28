@@ -10,10 +10,16 @@ from typing import TypedDict,Annotated
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph.message import add_messages
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever,ContextualCompressionRetriever
+from langchain_community.document_transformers import LongContextReorder,EmbeddingsRedundantFilter
+from langchain.retrievers.document_compressors import DocumentCompressorPipeline
 
 
-# from dotenv import load_dotenv
-# load_dotenv()
+from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain.memory import ConversationSummaryMemory
+from src.agent.model_loader import summary_llm
+
 
 
 class AgenticRAG(TypedDict):
@@ -28,9 +34,21 @@ class AgenticRAG(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
 
+# Create conversation summary memory
+chat_history = InMemoryChatMessageHistory()
+
+memory = ConversationSummaryMemory(
+    memory_key="chat_history",
+    chat_memory=chat_history,
+    llm=summary_llm,
+    return_messages=True)
+
+
 class GraphNodes:
-    def __init__(self,embeddeing_model):
-        self.embeddeing_model= embeddeing_model 
+    def __init__(self,embedding_model,reranker_model,summary_llm):
+        self.embedding_model= embedding_model 
+        self.reranker_model = reranker_model
+        self.summary_llm = summary_llm
 
     def Document_Loader(self,state: AgenticRAG):
         path = os.path.abspath(state["documents_path"])  # ensure absolute
@@ -55,7 +73,7 @@ class GraphNodes:
 
 
     def Create_Vector_Store(self,state:AgenticRAG):
-        embedder = self.embeddeing_model
+        embedder = self.embedding_model
         vector_store = FAISS.from_documents(documents=state["chunks"],embedding=embedder)
         vector_store.save_local(state["vectorstore_path"])
         return {"vectorstore_path":state["vectorstore_path"]}
@@ -63,7 +81,7 @@ class GraphNodes:
 
 
     def Load_Vector_Store(self,state:AgenticRAG):
-        embedder = self.embeddeing_model
+        embedder = self.embedding_model
         vector_store = FAISS.load_local(folder_path=state["vectorstore_path"],
                                         embeddings=embedder,
                                         allow_dangerous_deserialization=True)
@@ -73,35 +91,92 @@ class GraphNodes:
     def Retriever(self,state: AgenticRAG):
         vector_store = FAISS.load_local(
             folder_path=state["vectorstore_path"],
-            embeddings=self.embeddeing_model,
+            embeddings=self.embedding_model,
             allow_dangerous_deserialization=True)
-        retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+        
+        # Dense retriever
+        retriever = vector_store.as_retriever(search_type="similarity",search_kwargs={"k":5})
 
         query = state["query"]
 
-        docs = retriever.invoke(query)
+        if "chunks" in state:
+            ## Sparse retriever
+            bm25_retriever = BM25Retriever.from_documents(state["chunks"])
+            #if query is short like medical term we take bigger weight of bm25 retriever and if query is long like natual language then we reduce weightage of bm25 retriever
+            len_query = len(query.split())
+            if len_query<6:
+                weights = [0.6,0.4]
+            else:
+                weights = [0.85, 0.15]  # rely on FAISS more
+            
+            ensemble_retriever  = EnsembleRetriever(
+                retrievers=[retriever,bm25_retriever],
+                weights=weights)
+        else:
+            ensemble_retriever = retriever
+        
+        # Compression pipeline (rerank + deduplicate + reorder)
+        reranker = self.reranker_model # anks documents by how well they answer the user's question.
+        filter = EmbeddingsRedundantFilter(embeddings=self.embedding_model) # Removes duplicate or highly similar chunks.
+        reordering = LongContextReorder()  # Reorders documents to maximize coherence in long context windows
+        pipeline = DocumentCompressorPipeline(transformers=[reranker,filter,reordering])
+
+        compression_retriever = ContextualCompressionRetriever(
+            base_compressor= pipeline,
+            base_retriever=ensemble_retriever)
+    
+        docs = compression_retriever.invoke(query)
         return {"retrieved_docs": docs}
+
+    
+    def rebuild_memory_from_state(self,state):
+        """This Methood Rebuilds ConversationSummaryMemory by replaying saved Human/AI messages from persisted state, making the memory continuous across restarts.
+        Run this before Agent function
+        AFTER SERVER IS RESTART EMORY WILL STILL BE THIER
+        """
+        memory.chat_memory.clear()  # clear any old messages
+        for msg in state.get("messages", []):
+            if isinstance(msg, HumanMessage):
+                memory.chat_memory.add_user_message(msg.content)
+            elif isinstance(msg, AIMessage):
+                memory.chat_memory.add_ai_message(msg.content)
+
 
 
     def Agent(self,state: AgenticRAG):
+        # 🔑 Always rebuild memory from state before use
+        self.rebuild_memory_from_state(state)
+        
         docs = state["retrieved_docs"]
-        context = "\n\n".join([doc.page_content for doc in docs])
+        # context = "\n\n".join([doc.page_content for doc in docs])
+        context = "\n\n".join([f"Source: {doc.metadata.get('filename', '')}, Page: {doc.metadata.get('page', '')}\n{doc.page_content}"
+        for doc in docs])
 
-        query = state["query"]
+        # Load summarized history
+        past_dialogue = memory.load_memory_variables({})["chat_history"]
 
-        formatted_prompt = prompt_template.format(
+        # Format prompt
+        formated_prompt = prompt_template.format(
+            history=past_dialogue,
             context=context,
-            question=query)
-        response = model.invoke(formatted_prompt)
+            question=state["query"])
 
-        # Save to state (sqlite)
+        response = model.invoke(formated_prompt)
+
+        # Update summary memory properly
+        memory.save_context(
+            {"input": state["query"]}, 
+            {"output": response.content})
+
+        # Save to state instead of external memory
         state.setdefault("messages", [])
         state["messages"].append(HumanMessage(content=state["query"]))
         state["messages"].append(AIMessage(content=response.content))
+        
         return {
             "answer": response.content,
-            "messages": state["messages"]
-            }
+            "messages": state["messages"]}
+
 
     def check_pdf_or_not(self,state: AgenticRAG):
         if state.get("documents_path") and not os.path.exists(state["vectorstore_path"]):

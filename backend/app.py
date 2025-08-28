@@ -64,9 +64,9 @@ uploaded_pdfs_store = {}  # {"PDF_my_resume": "./temp_pdfs/PDF_my_resume.pdf"}
 #===============================================Pre Defined Vector Store Path =========================================================
  
 VECTORSTORE_PATHS = {
-    "Dermatology🩺": "./vectorstores/dermatology_faiss",
-    "Psychiatrist🧠": "./vectorstores/psychiatrist_faiss",
-    "Legal🏛️": "./vectorstores/legal_faiss"
+    "Dermatology🩺": "./vectorstores/Dermatology",
+    "Psychiatrist🧠": "./vectorstores/psychiatrist",
+    "Legal🏛️": "./vectorstores/Legal"
 }
     
 #============================================================ Hanlde Uploaaded PDF ==============================================================

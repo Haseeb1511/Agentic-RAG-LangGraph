@@ -16,3 +16,6 @@ uvicorn[standard]
 python-multipart
 
 fastapi
+
+langchain-cohere
+rank_bm25

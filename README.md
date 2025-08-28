@@ -28,7 +28,7 @@ An **Agentic Retrieval-Augmented Generation (RAG)** system built with **LangGrap
 4. **Predefined vector stores** (Dermatology, Psychology, Legal, etc.)
 5. **Agentic system** with modular nodes
 6. **FastAPI + Streamlit integration**
-7. **Docker Compose** for easy deployment
+7. **Docker Compose** for easy deployment + Locall Testing
 
 ---
 

@@ -17,7 +17,9 @@ aiosqlite
 streamlit
 fastapi
 uvicorn[standard]
+python-multipart   #FastAPI requires python-multipart to handle file uploads (UploadFile, form-data requests, etc.),
 
-
+langchain-cohere
+rank_bm25
 
 -e .
