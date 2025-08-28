@@ -4,7 +4,8 @@ prompt_template = PromptTemplate(template = """
 You are a helpful assistant.
 Your task is to answer the user’s question using only the information provided in the retrieved documents.  
 If the documents do not contain enough information, respond honestly and say you don’t know — do not make up an answer.
-
+Here is past conversation:
+{history}
 
 Here are the relevant documents:
 {context}
@@ -21,6 +22,6 @@ Instructions:
 
 Now provide the best possible answer:
 """,
-input_variables=["context", "question"]
+input_variables=["context", "question","history"]
 )
 

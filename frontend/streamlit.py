@@ -4,13 +4,13 @@ from pathlib import Path
 from typing import Dict
 import os
 
-# ================================================================ Configuration ==============================================================
+# ============================================= Configuration =====================================================
 
 # FastAPI backend URL
 # API_BASE_URL = "http://localhost:8000"
 API_BASE_URL = os.environ.get("API_URL", "http://localhost:8000")  # for server (aws) or docker compose this work
 
-#================================================================== Helper Functions ========================================================
+#================================================= Helper Functions =============================================
 def make_api_request(endpoint:str,method:str="GET",data:dict=None,files:Dict=None):
     url = f"{API_BASE_URL}/{endpoint.lstrip('/')}" #remove leading whitespaces
     if method == "GET":
@@ -62,7 +62,7 @@ def load_chat_history(thread_id:str):
     return []
 
 
-#============================================================== Streamlit Configuration ========================================================
+#============================================= Streamlit Configuration ===========================================
 
 st.set_page_config(
     page_title="Agentic RAG Q&A",
@@ -72,7 +72,7 @@ st.set_page_config(
 )
 
 
-#======================================================================= Session State ========================================================
+#================================================ Session State ================================================
 if "uploaded_pdfs" not in st.session_state:
     st.session_state["uploaded_pdfs"] = []
 
@@ -84,7 +84,7 @@ if "api_connected" not in st.session_state:
     st.session_state["api_connected"] = bool(health_Check)
 
 
-# ================================================================ Sidebar ==============================================================
+# ========================================= Sidebar ======================================================
 
 st.sidebar.title("🤖 Agentic RAG Q&A")
 
@@ -94,8 +94,7 @@ if st.session_state["api_connected"]:
 else:
     st.sidebar.error("API DIsconnected")
 
-# ============================================================================== Upload PDF =====================================================
-# PDF Upload
+# ============================================= Upload PDF ======================================================
 st.sidebar.header("📄 Upload PDF")
 uploaded_pdf = st.sidebar.file_uploader("Upload pDF to chat with them",type=["PDF"])
 if uploaded_pdf and st.session_state["api_connected"]:
@@ -112,7 +111,7 @@ if uploaded_pdf and st.session_state["api_connected"]:
         else:
             st.sidebar.error("Failed to Upload PDF")
 
-# ======================================================== load Avaliable Choices after upload PDF ============================
+# ========================================= load Avaliable Choices after upload PDF ======================
 #Load avaliable chice
 if st.session_state["api_connected"]:
     all_choices = load_vactorstores()
@@ -123,17 +122,17 @@ else:
 st.sidebar.header("Chose Knowledge Base")
 choice=  st.sidebar.radio("Select from",all_choices)
 
-#===================================== Make sure that current thread is same as Choice ====================================================
+#===================================== Make sure that current thread is same as Choice ===================
 # Update current thread when choice changes
 if choice != st.session_state["current_thread"]:
     st.session_state["current_thread"] = choice
 
 
-#========================================================== Title ==============================================================================
+#========================================================== Title ============================================
 
 st.title("🤖 Agentic RAG Q&A")
 
-#======================================================================== landing Page ==========================================================
+#============================================== landing Page ==========================================
 if choice == "Landing Page":
     st.markdown("<h1 style='text-align: center; color:red;'>Agentic RAG Q&A</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; color: #6A5ACD;'>Chat intelligently with predefined knowledge bases or your own PDFs</h3>", unsafe_allow_html=True)
@@ -203,8 +202,7 @@ if choice == "Landing Page":
 
     st.stop()
 
-# ================================================================ Load Chat History ===========================================================
-
+# =============================================== Load Chat History =============================================
 # Only show chat if API is connected and not on landing page
 if not st.session_state["api_connected"]:
     st.error("🚫 Cannot start chat without API connection. Please start the FastAPI backend.")
@@ -223,7 +221,7 @@ for message in messages:
     with st.chat_message(role):
         st.markdown(content)
 
- # ============================================================== User input ===================================================================
+ # ====================================================== User input =============================================
 
 user_input = st.chat_input("Ask anything ....")
 
@@ -242,7 +240,7 @@ if user_input:
         else:
             st.error("Sorry i could not process your query")
 
-# ============================================================== Sidebar Additional Options ===================================================
+# ========================================== Sidebar Additional Options ===================================
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Options")

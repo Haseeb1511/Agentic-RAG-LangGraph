@@ -14,10 +14,10 @@ from pathlib import Path
 # Add project root to sys.path to import local modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-#===============================================================Fast API Object==============================================================
+#===============================================================Fast API Object==========================================================
 app = FastAPI(title="Agentic RAG Backend")
 
-#============================================================= Hanlde Request from Any Origin ====================================================
+#============================================================= Hanlde Request from Any Origin ===========================================
 
 # Add CORS middleware to allow requests from any origin
 app.add_middleware(
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#=================================================================== Model(Schema) =============================================================
+#=================================================================== Model(Schema) ======================================================
 class QueryRequest(BaseModel):
     query:str
     thread_id:str
@@ -69,7 +69,7 @@ VECTORSTORE_PATHS = {
     "Legal🏛️": "./vectorstores/Legal"
 }
     
-#============================================================ Hanlde Uploaaded PDF ==============================================================
+#============================================================ Hanlde Uploaaded PDF =======================================================
 
 # UploadFile has these attributes:
 # filename: original file name from the client.  --->uploade_file.name
@@ -109,7 +109,7 @@ async def upload_pdf(file: UploadFile): # #upload file is built in fast api vali
     }
 
 
-#========================================================= Get Vectorstore including pdf ====================================================
+#========================================================= Get Vectorstore including pdf ===============================================
 @app.get("/vectorstores")
 async def get_vectorstores():
     "Get List of Avaliable Vectorstore"
@@ -122,7 +122,7 @@ async def get_vectorstores():
     }
 
 
-#====================================================hanle User Query for Both Scenerio =========================================================
+#====================================================hanle User Query for Both Scenerio ================================================
 @app.post("/query",response_model=QueryResponse)
 async def process_query(request:QueryRequest):
     """This function let user chat with PDF + Vectorstores"""
@@ -179,7 +179,7 @@ async def get_chat_history(thread_id:str):
     messages = load_conversation(thread_id=thread_id)
     return ChatHistoryResponse (messages = messages)
 
-#============================================================= Downlaod the Graph(FOr Future USe) ================================================
+#============================================================= Downlaod the Graph(FOr Future USe) ========================================
 from fastapi.responses import FileResponse
 
 # With BytesIO, Streamlit can render it from memory

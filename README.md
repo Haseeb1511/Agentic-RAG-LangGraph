@@ -1,12 +1,8 @@
-# 📚 Agentic RAG with LangGraph
 
-An **Agentic Retrieval-Augmented Generation (RAG)** system built with **LangGraph** and **LangChain**, featuring:
+# 🧠 Agentic RAG Application  
 
-* Persistent memory with SQLite checkpointer
-* Modular, node-based design
-* Google Generative AI embeddings
-* FastAPI backend + Streamlit frontend
-* Docker Compose for deployment
+An **Agentic Retrieval-Augmented Generation (RAG)** system built with **Streamlit (frontend)** and **FastAPI (backend)**.  
+The project is modular, containerized with **Docker Compose**, and integrates advanced retrieval, memory, and persistence mechanisms.  
 
 ---
 
@@ -18,17 +14,141 @@ An **Agentic Retrieval-Augmented Generation (RAG)** system built with **LangGrap
 
 ![Graph Workflow](graph.png)
 
+
+## 🚀 Features  
+
+- **Multi-Domain Predefined Vector Stores**  
+  - 🩺 Dermatology  
+  - 🧠 Psychiatry  
+  - ⚖️ Legal  
+  - ➕ Upload & Chat with your own PDF  
+
+- **Agentic Workflow**  
+  - Modular agent design (`src/agent/agentic_workflow.py`)  
+  - Flexible node system (`src/all_nodes/nodes.py`)  
+  - Prompt library (`src/prompt_library/prompt.py`)  
+
+- **Retrieval System**  
+  - Hybrid Retrieval → **BM25 + Dense Embeddings**  
+  - Coherence Ranker  
+  - Redundant Document Filter  
+  - LongContext Reorder  
+  - Contextual Compression Retrieval  
+
+- **Memory & Persistence**  
+  - **SQLite Checkpointer** for chat persistence  
+  - **Conversation Summary Memory** for contextual awareness  
+
+- **Embeddings**  
+  - Uses Google Generative AI embeddings  
+
+- **Containerization**  
+  - Fully dockerized using **Docker Compose**  
+
 ---
 
-## 🚀 Major Features
+## 📂 Project Structure  
 
-1. **Chat persistence** → via LangGraph SQLite checkpointer
-2. **Memory support** (recall past chats)
-3. **PDF upload & Q\&A**
-4. **Predefined vector stores** (Dermatology, Psychology, Legal, etc.)
-5. **Agentic system** with modular nodes
-6. **FastAPI + Streamlit integration**
-7. **Docker Compose** for easy deployment + Locall Testing
+```
+
+.
+├── backend/
+│   └── app.py                # FastAPI backend
+├── frontend/
+│   └── streamlit\_app.py      # Streamlit frontend
+├── src/
+│   ├── agent/
+│   │   └── agentic\_workflow\.py
+│   ├── all\_nodes/
+│   │   └── nodes.py
+│   ├── prompt\_library/
+│   │   └── prompt.py
+│   ├── model\_loader.py
+│   ├── logger/
+│   └── exception/
+├── requirements.txt
+├── docker-compose.yml
+├── graph.png                 # Workflow diagram
+├── ui\_images/                # UI screenshots
+└── notebook/
+├── notebook\_with\_conversationbuffermemory.ipynb
+├── notebook\_with\_createvectorstore.ipynb
+├── notebook\_with\_load\_vectorstore.ipynb
+└── notebook\_with\_streaming.ipynb
+
+````
+
+---
+
+## ⚙️ Installation  
+
+### 1️⃣ Clone Repository  
+```bash
+git clone https://github.com/Haseeb1511/Agentic-RAG-LangGraph.git
+cd agentic-rag-app
+````
+
+### 2️⃣ Setup Environment (Without Docker)
+
+```bash
+pip install -r requirements.txt
+```
+
+Run backend:
+
+```bash
+uvicorn backend.app:app --reload
+```
+
+Run frontend:
+
+```bash
+streamlit run frontend/streamlit_app.py
+```
+
+### 3️⃣ Run with Docker Compose (Recommended)
+
+```bash
+docker compose up --build
+```
+
+Access:
+
+* Streamlit UI → [http://localhost:8501](http://localhost:8501)
+* FastAPI Docs → [http://localhost:8000/docs](http://localhost:8000/docs)
+
+## 🔑 Environment Setup
+
+Create a `.env` file in the root directory:
+
+```bash
+GROQ_API_KEY=your_groq_api_key
+OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_google_api_key
+COHERE_API_KEY=your_cohere_api_key
+```
+
+---
+
+## 🛠️ Tech Stack
+
+* **Frontend**: Streamlit
+* **Backend**: FastAPI
+* **Embeddings**: Google Generative AI
+* **Vector Stores**: FAISS / BM25 / Hybrid Retrieval
+* **Memory**: SQLite Checkpointer + Conversation Summary Memory
+* **Deployment**: Docker Compose
+
+---
+
+## 🧑‍💻 Notebooks
+
+* **notebook_with_conversationbuffermemory.ipynb**
+* **notebook_with_createvectorstore.ipynb**
+* **notebook_with_load_vectorstore.ipynb**
+* **notebook_with_streaming.ipynb**
+
+---
 
 ---
 
@@ -46,29 +166,6 @@ An **Agentic Retrieval-Augmented Generation (RAG)** system built with **LangGrap
 
 📌 *SQLite checkpointer = your diary → keeps track of all past conversations.*
 
----
-
-## 📂 Project Structure
-
-```bash
-backend/app.py                 # FastAPI backend
-frontend/streamlit             # Streamlit UI
-src/
- ├── agent/
- │    ├── model_loader.py      # Model loading utilities
- │    ├── agentic_workflow.py  # Graph builder logic
- ├── all_nodes/nodes.py        # LangGraph nodes (loader, splitter, retriever, agent)
- ├── exception/                # Custom error handling
- ├── logger/                   # Logging utilities
- ├── prompt_library/           # Prompts for the agent
-requirements.txt               # Dependencies
-chat_hist/chat.db              # SQLite checkpoint store
-graph.png                      # Workflow diagram
-notebook/
- ├── notebook_with_conversationbuffermemory.ipynb
- ├── notebook_with_createvectorstore.ipynb
- ├── notebook_with_load_vectorstore.ipynb
- └── notebook_with_streaming.ipynb
 ```
 
 ---
@@ -82,42 +179,5 @@ cd <your-repo>
 
 # Install dependencies
 pip install -r requirements.txt
-```
-
----
-
-## ▶️ Running the Project
-
-### 1. Start Backend (FastAPI)
-
-```bash
-uvicorn backend.app:app --reload
-```
-
-### 2. Start Frontend (Streamlit)
-
-```bash
-streamlit run streamlit_app.py
-```
-
-### 3. Run with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-* Streamlit: [http://localhost:8501](http://localhost:8501)
-* FastAPI: [http://localhost:8000](http://localhost:8000)
-
----
-
-## 🔑 Environment Setup
-
-Create a `.env` file in the root directory:
-
-```bash
-GROQ_API_KEY=your_groq_api_key
-OPENAI_API_KEY=your_openai_api_key
-GOOGLE_API_KEY=your_google_api_key
 ```
 
