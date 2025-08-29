@@ -2,9 +2,15 @@ import streamlit as st
 import requests
 from pathlib import Path
 from typing import Dict
-import os
+import os,sys
 
-# ============================================= Configuration =====================================================
+# Add project root (one level up from frontend) to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.audio.audio_record import speech_to_text,record_audio
+
+
+# ============================================= Configuration ==========================================
 
 # FastAPI backend URL
 # API_BASE_URL = "http://localhost:8000"
@@ -123,6 +129,7 @@ st.sidebar.header("Chose Knowledge Base")
 choice=  st.sidebar.radio("Select from",all_choices)
 
 #===================================== Make sure that current thread is same as Choice ===================
+
 # Update current thread when choice changes
 if choice != st.session_state["current_thread"]:
     st.session_state["current_thread"] = choice
@@ -223,7 +230,16 @@ for message in messages:
 
  # ====================================================== User input =============================================
 
-user_input = st.chat_input("Ask anything ....")
+text_input = st.chat_input("Ask anything ....")
+
+if st.button("🎤 Speak"):
+    with st.spinner("listining..."):
+        audio_path = record_audio()
+        audio_input = speech_to_text(audio_path=audio_path)
+else:
+    audio_input=None
+
+user_input = text_input or audio_input
 
 if user_input:
     # Display user message

@@ -22,6 +22,7 @@ The project is modular, containerized with **Docker Compose**, and integrates ad
   - 🧠 Psychiatry  
   - ⚖️ Legal  
   - ➕ Upload & Chat with your own PDF  
+  -     Audio + Text Input
 
 - **Agentic Workflow**  
   - Modular agent design (`src/agent/agentic_workflow.py`)  

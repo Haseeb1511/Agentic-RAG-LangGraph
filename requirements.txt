@@ -22,4 +22,16 @@ python-multipart   #FastAPI requires python-multipart to handle file uploads (Up
 langchain-cohere
 rank_bm25
 
+
+
+
+#voice input
+pyaudio        # Record audio from microphone.
+pydub          # Audio manipulation (convert/export to MP3, WAV, etc.).
+ffmpeg         # Required backend for pydub((needed for exporting in formats like MP3).
+SpeechRecognition   # Convert speech → text
+groq
+
+
+
 -e .
