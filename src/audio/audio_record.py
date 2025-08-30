@@ -8,13 +8,17 @@
 import os
 import speech_recognition as sr
 from pydub import AudioSegment
-from groq import Groq
 from io import BytesIO
-from dotenv import load_dotenv
-load_dotenv()
+
+from src.agent.model_loader import audio_converter_model
 
 os.makedirs("./input_audio",exist_ok=True)
 def record_audio(audio_save_path="./input_audio/input.wav"):
+    """
+    This function record audio and return the audio save path
+    Return:
+        audio save path
+    """
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source=source,duration=1)
@@ -27,8 +31,9 @@ def record_audio(audio_save_path="./input_audio/input.wav"):
     audio_segment.export(audio_save_path.replace(".wav",".mp3"),format="mp3",bitrate="128k")
     return audio_save_path
 
+
 def speech_to_text(audio_path:str):
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    client = audio_converter_model
     model_stt = "whisper-large-v3-turbo"
     with open(audio_path,"rb") as audio_file:
         transcription  = client.audio.transcriptions.create(

@@ -2,9 +2,12 @@ streamlit
 requests
 pathlib
 
+langchain-openai
+langchain_google_genai
+langchain-groq
+langchain-cohere
+
 pyaudio        # Record audio from microphone.
-pydub          # Audio manipulation (convert/export to MP3, WAV, etc.).
-ffmpeg         # Required backend for pydub((needed for exporting in formats like MP3).
-SpeechRecognition   # Convert speech → text
-groq
-python-dotenv
+pydub          # Audio manipulation (convert/export to MP3, WAV, etc.).  remove
+ffmpeg         # Required backend for pydub((needed for exporting in formats like MP3).   
+SpeechRecognition   # Convert speech → text  remove

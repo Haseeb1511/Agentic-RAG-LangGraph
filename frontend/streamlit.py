@@ -67,6 +67,19 @@ def load_chat_history(thread_id:str):
         return response.get("messages",[])
     return []
 
+def convert_audio_to_text(audio_file_path: str, thread_id: str):
+    """
+    Send audio to FastAPI -> get transcription -> return transcription text
+    """
+    with open(audio_file_path, "rb") as f:
+                         #uploaded_filename          uploadedfile   MME format
+        files = {"file": (Path(audio_file_path).name, f, "audio/wav")}
+        response = make_api_request(endpoint="upload_audio", method="POST", files=files)
+    # we take transcription as fast api return like this--->{"transcription": "What is acne?"}
+    transcribed_text = response.get("transcription", "") 
+    return transcribed_text
+
+
 
 #============================================= Streamlit Configuration ===========================================
 
@@ -228,19 +241,45 @@ for message in messages:
     with st.chat_message(role):
         st.markdown(content)
 
- # ====================================================== User input =============================================
+ # ======================================= User input(audio + text) =============================================
 
+# Browser microphone access
+# Streamlit uses the MediaRecorder API of the browser.
+# The browser pops up the usual “Allow microphone access?” prompt.
+# If the user clicks Allow, audio is recorded locally in the browser.
+
+# THIS WORK WITH DOCKER 
 text_input = st.chat_input("Ask anything ....")
 
-if st.button("🎤 Speak"):
-    with st.spinner("listining..."):
-        audio_path = record_audio()
-        audio_input = speech_to_text(audio_path=audio_path)
-else:
-    audio_input=None
+# Browser microphone recording (works inside Docker too)
+audio_data = st.audio_input("🎤 Speak your question")  #this record audio built in streamlit
 
+audio_input = None
+if audio_data is not None:
+    with st.spinner("🎙️ Transcribing..."):
+        import tempfile
+        #This saves the in-memory audio to a real .wav file on disk
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
+            tmpfile.write(audio_data.getbuffer())
+            tmpfile_path = tmpfile.name
+        audio_input = convert_audio_to_text(audio_file_path=tmpfile_path, thread_id=thread_id) #we need to pass thread_id also as query endpoint require it
+
+# Prefer text if both are provided
 user_input = text_input or audio_input
 
+
+# text_input = st.chat_input("Ask anything ....")
+
+# audio_input = None
+# if st.button("🎤 Speak"):
+#     with st.spinner("🎙️ Listening..."):
+#         audio_path = record_audio()
+#         #we pass thread_id because our {send_query_to_api} expect query +thread id for text input we already passed it in the dunction
+#         audio_input = convert_audio_to_text(audio_file_path=audio_path, thread_id=thread_id)# we pass thread id as our text query 
+
+# user_input = text_input or audio_input
+
+#================================================================Main======================================
 if user_input:
     # Display user message
     with st.chat_message("user"):

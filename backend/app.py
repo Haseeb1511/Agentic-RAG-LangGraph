@@ -1,6 +1,7 @@
 #hreads in this project  Uploaded pdf,Legal🏛️Psychiatrist🧠,Dermatology🩺
 
 from fastapi import FastAPI,HTTPException,UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -28,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#=================================================================== Model(Schema) ======================================================
+#================================================== Model(Schema) ======================================
 class QueryRequest(BaseModel):
     query:str
     thread_id:str
@@ -47,21 +48,21 @@ class ChatHistoryResponse(BaseModel):
     messages : list[ChatMessage]
 
 
-#=================================================== Health Check EndPoint ===============================================================
+#=============================================== Health Check EndPoint ======================================
 
 @app.get("/")
 async def root():
     return {"message":"ai agent is running"}
-#================================================== Graph Builder(src/agent/agentic_workflow.py) ===================================
+#===================================== Graph Builder(src/agent/agentic_workflow.py) ===================
 
 graph = GraphBuilder()
 workflow = graph.build_graph()
 
-#============================================== Dict to Store Uploaded PDF path ===============================================
+#====================================== Dict to Store Uploaded PDF path =======================================
 
 uploaded_pdfs_store = {}  # {"PDF_my_resume": "./temp_pdfs/PDF_my_resume.pdf"}
  
-#===============================================Pre Defined Vector Store Path =========================================================
+#===========================================Pre Defined Vector Store Path ===================================
  
 VECTORSTORE_PATHS = {
     "Dermatology🩺": "./vectorstores/Dermatology",
@@ -69,7 +70,7 @@ VECTORSTORE_PATHS = {
     "Legal🏛️": "./vectorstores/Legal"
 }
     
-#============================================================ Hanlde Uploaaded PDF =======================================================
+#=========================================== Hanlde Uploaaded PDF ==============================================
 
 # UploadFile has these attributes:
 # filename: original file name from the client.  --->uploade_file.name
@@ -109,7 +110,7 @@ async def upload_pdf(file: UploadFile): # #upload file is built in fast api vali
     }
 
 
-#========================================================= Get Vectorstore including pdf ===============================================
+#=================================== Get Vectorstore including pdf ==========================================
 @app.get("/vectorstores")
 async def get_vectorstores():
     "Get List of Avaliable Vectorstore"
@@ -122,7 +123,7 @@ async def get_vectorstores():
     }
 
 
-#====================================================hanle User Query for Both Scenerio ================================================
+#====================================================hanle User Query for Both Scenerio =================
 @app.post("/query",response_model=QueryResponse)
 async def process_query(request:QueryRequest):
     """This function let user chat with PDF + Vectorstores"""
@@ -154,7 +155,7 @@ async def process_query(request:QueryRequest):
         thread_id=thread_id
     )
         
-#===========================================Load Past history from the DB ==============================================================
+#===========================================Load Past history from the DB ====================================
 
 #we load conversation for 1 chat(thread) at a time
 def load_conversation(thread_id:str):
@@ -179,7 +180,40 @@ async def get_chat_history(thread_id:str):
     messages = load_conversation(thread_id=thread_id)
     return ChatHistoryResponse (messages = messages)
 
-#============================================================= Downlaod the Graph(FOr Future USe) ========================================
+
+#============================================ Audio File Hanlde =================================================
+from src.audio.audio_record import record_audio,speech_to_text
+
+@app.post("/upload_audio")
+async def upload_audio(file:UploadFile):
+    """
+    Receives an uploaded audio file from Streamlit, saves it to a temporary 
+    directory, and passes it to the [speech_to_text] function for transcription
+    Args:
+        file (UploadFile): The uploaded audio file (.wav or .mp3).
+    
+    Returns:
+        JSONResponse: A response containing the transcription text.
+    """
+    if not file.filename.endswith((".wav",".mp3")):
+        raise HTTPException(status_code=400, detail="Only audio files allowed")
+    temp_dir = Path("./input_audio")
+    temp_dir.mkdir(exist_ok=True)
+
+    temp_audio_path = temp_dir/file.filename
+    with open(temp_audio_path,"wb") as f:
+        shutil.copyfileobj(file.file,f)
+    
+    # existing speech-to-text function
+    text = speech_to_text(str(temp_audio_path))
+
+    return JSONResponse(content={"transcription": text})
+
+## record_audio() saves file → returns path
+## convert_audio_to_text() opens path → sends file to FastAPI from streamlit
+## FastAPI saves it in ./input_audio/ again → runs speech_to_text() to convert itinto transcription(text)
+
+#================================= Downlaod the Graph(FOr Future USe) =====================================
 from fastapi.responses import FileResponse
 
 # With BytesIO, Streamlit can render it from memory

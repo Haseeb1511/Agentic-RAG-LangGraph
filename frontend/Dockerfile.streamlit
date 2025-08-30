@@ -7,22 +7,24 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-
-
+     
+# our python:3.12-slim base image is very minimal.
+# It doesn’t come with gcc or PortAudio headers.
+# pyaudio has no prebuilt wheel for Linux + Python 3.12 → pip tries to compile it from source → fails because gcc is missing.
 # When you run pip install pyaudio, pip downloads a prebuilt wheel (binary .whl) for your OS + Python version.
 # → No compilation needed. That’s why it “just works” on your PC.
 # Inside Docker (Debian slim image):
 # For python:3.12-slim, there’s no prebuilt PyAudio wheel available on PyPI for Linux + Python 3.12.
 # → Pip falls back to building from source → requires gcc + portaudio headers → fails if those system libs aren’t installed.
 #pyaudio needs gcc + portaudio headers to compile inside docker file in order to use audio input
-# Install build dependencies for PyAudio (PortAudio + GCC)
+# Install build dependencies for PyAudio (PortAudio + GCC).
 RUN apt-get update && apt-get install -y \
     gcc \
     portaudio19-dev \
     python3-dev \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
-     
+
 
 COPY frontend/requirements.txt /app/requirements.txt
 
@@ -30,6 +32,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY frontend/ /app/
 COPY src/audio /app//src/audio  
+COPY src/agent/model_loader.py /app/src/agent/
 
 EXPOSE 8501
 
